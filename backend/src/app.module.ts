@@ -14,6 +14,7 @@ import { PayrollModule } from './payroll/payroll.module';
 import { AssetsModule } from './assets/assets.module';
 import { MisModule } from './mis/mis.module';
 import { ConsolidationModule } from './consolidation/consolidation.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ConsolidationModule } from './consolidation/consolidation.module';
     AssetsModule,
     MisModule,
     ConsolidationModule,
+    IntegrationsModule,
     KernelModule,
   ],
 })

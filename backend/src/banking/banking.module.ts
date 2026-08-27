@@ -8,5 +8,6 @@ import { BankStatementsController, BankStatementsService } from './bank-statemen
   imports: [SalesModule, PurchasingModule],
   controllers: [BankStatementsController],
   providers: [MatchingEngineService, BankStatementsService],
+  exports: [BankStatementsService],
 })
 export class BankingModule {}

@@ -10,18 +10,25 @@ workflow/approvals and group consolidation — not a standalone bookkeeping app.
 
 ## Status
 
-**Phase 1 implemented: Multi-Tenant Kernel + Authentication + RBAC.** The
-full architecture was designed and approved first (see below); Phase 1 now
-has a working NestJS + PostgreSQL backend with Row-Level Security tenant
-isolation, JWT + MFA auth, and RBAC — with an automated test suite proving
-the phase's exit criterion (cross-tenant isolation) at the API layer, the
-service layer, and the raw database layer.
+**All 12 roadmap phases implemented.** The full architecture was designed
+and approved first (see below), then built phase by phase on a NestJS +
+PostgreSQL backend: multi-tenant kernel with Row-Level Security isolation,
+JWT + MFA auth and RBAC, master data, the Central Accounting Engine,
+Sales/Purchasing, inventory with weighted-average costing, bank
+reconciliation, payroll, fixed assets/budgeting, MIS, group consolidation,
+and integration adapters. Every phase has a passing automated e2e test
+proving its roadmap exit criterion (26 tests across 11 suites) — see
+[`backend/README.md`](backend/README.md) for the phase-by-phase breakdown,
+including the couple of deliberate, documented simplifications (no GR/IR
+clearing account; Phase 12's Peppol/attendance-device adapters are
+documented stubs since this environment has no real external
+credentials/hardware to connect to).
 
 Start here:
 
-- [`backend/`](backend/) — the Phase 1 implementation (NestJS + Prisma +
-  PostgreSQL). See [`backend/README.md`](backend/README.md) for setup and
-  how to run the tests.
+- [`backend/`](backend/) — the full implementation (NestJS + Prisma +
+  PostgreSQL). See [`backend/README.md`](backend/README.md) for setup, what
+  each phase implements, and how to run the tests.
 - [`docs/architecture/00-OMNIERP-ARCHITECTURE.md`](docs/architecture/00-OMNIERP-ARCHITECTURE.md) —
   the complete architecture document (system design, multi-tenancy, ERD,
   central accounting engine, module map, API design, security/RBAC, MIS,
@@ -41,5 +48,8 @@ exactly one place double-entry accounting logic lives.
 
 ## Next step
 
-Phase 2: Database + Master Data (Chart of Accounts, tax codes, customers,
-suppliers, employees, products, price lists, projects).
+All roadmap phases are implemented and tested. Natural follow-ups from
+here (not yet done): a frontend, the documented Phase 6 GR/IR clearing
+gap, rate limiting/security-header hardening, and real external
+credentials for Phase 12's Peppol/attendance integrations when a business
+has them to connect to.

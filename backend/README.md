@@ -5,6 +5,16 @@ NestJS + Prisma + PostgreSQL implementation, tracking the phased roadmap in
 section J. This file is updated as each phase lands — see git history for
 the sequence.
 
+## Status: all 12 roadmap phases implemented
+
+Every phase in the roadmap has working code and a passing e2e test proving
+its stated exit criterion (`npm test` — 26 tests, 11 suites, one per phase
+plus the Phase 1 isolation suite). Phase 12 is the one exception to "fully
+real": it ships one genuinely working integration (a CSV bank feed
+adapter) plus two explicitly-documented stubs for integrations that need
+real external access this environment doesn't have — see that section
+below.
+
 ## What's implemented (Phases 1–6)
 
 - **Phase 1 — Kernel, auth, RBAC**: Tenant → Business Group → Company →
@@ -40,6 +50,48 @@ the sequence.
   out at the current average and automatically posts a COGS entry through
   the Accounting Engine; Stock Counts post their variance the same way.
 
+## What's implemented (Phases 7–12)
+
+- **Phase 7 — Banking & reconciliation**: `MatchingEngineService` is a
+  deliberately simple, explainable scoring heuristic (not ML) — it checks a
+  bank statement line's signed amount against open invoice balances and its
+  description text against the customer/supplier name, producing a 0-100
+  confidence score. Approving a suggestion books and posts the real
+  Customer Receipt / Supplier Payment; nothing is ever silently posted.
+- **Phase 8 — HR & Payroll**: salary structures (effective-dated, per
+  employee) and payroll runs. A run posts exactly one aggregate
+  `PAYROLL_RUN_POSTED` entry through the Accounting Engine for the whole
+  run, not one per employee — per-employee detail lives in `Payslip` rows.
+- **Phase 9 — Fixed Assets & Budgeting**: straight-line depreciation
+  schedules generated at asset creation; a `run-depreciation` action posts
+  every still-pending period due by a date automatically. Budgets are a
+  named series of amounts keyed like `gl_account_balances` (account ×
+  period × cost centre); the variance report compares them directly against
+  it rather than a parallel actuals table.
+- **Phase 10 — MIS**: `MisService` computes the dashboard (Revenue, Gross/Net
+  Margin, EBITDA, Cash, AR/AP, Inventory, Working Capital, AR/AP/Inventory
+  Days, Cash Conversion Cycle) and drill-down entirely from
+  `gl_account_balances`, using each account's `mis_category`/`control_type`
+  tags — no separate MIS data store.
+- **Phase 11 — Group Consolidation**: `ConsolidationRunsService` reads each
+  group company's trial balance, translates to a presentation currency via
+  that company's configured exchange rate, and writes its own output rows —
+  never posts back into a subsidiary's ledger. `IntercompanyTransactionsService`
+  tracks matched/unmatched pairs; finalizing a run is blocked while any
+  unmatched transaction exists for the group (the mandatory pre-run mismatch
+  check). Elimination is intentionally narrow: a company tags one account
+  `controlType = 'INTERCOMPANY'`, and matched transactions reduce that
+  account's translated balance.
+- **Phase 12 — Integrations**: `CsvBankFeedAdapter` is a real, working
+  adapter — it parses a CSV bank export and feeds the result through the
+  same `BankStatementsService.import()` a manual upload uses, matching
+  engine included. `PeppolStubAdapter` and `AttendanceStubAdapter` are
+  explicitly-documented stubs: a real Peppol connection needs certified
+  Access Point registration, and a real attendance integration needs actual
+  device/vendor API access — neither exists in this environment. Both
+  implement the same adapter interface a real client would, so dropping one
+  in later touches no Sales/Payroll module code.
+
 ## Two Prisma connections, on purpose
 
 - `PlatformPrismaService` connects with the migration/owner credentials
@@ -70,12 +122,15 @@ The API is served under `/api/v1`.
 
 ## Running the tests
 
-The exit criterion for Phase 1 (roadmap section J) is a passing automated
-cross-tenant isolation test. It runs against a real Postgres database
-(`omnierp_test` by default — see `.env.test`), at three layers: the HTTP
-API, a direct service call that bypasses the controller entirely, and a
-raw query with no tenant context set at all (fail-closed check), plus the
-audit log's append-only guarantee and a basic RBAC-denial check.
+`npm test` runs the whole suite — one spec file per phase (plus the Phase 1
+isolation suite, which is the most heavily checked since it's the
+platform's core security guarantee), each asserting its phase's exit
+criterion from the roadmap against a real Postgres database (`omnierp_test`
+by default — see `.env.test`). The Phase 1 suite in particular checks
+isolation at three layers: the HTTP API, a direct service call that
+bypasses the controller entirely, and a raw query with no tenant context
+set at all (fail-closed check), plus the audit log's append-only guarantee
+and a basic RBAC-denial check.
 
 ```bash
 createdb omnierp_test   # once
