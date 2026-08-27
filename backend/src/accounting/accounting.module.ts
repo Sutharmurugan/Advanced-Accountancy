@@ -31,6 +31,7 @@ import { ReportsService } from './reports/reports.service';
     NumberingService,
     AccountingEngineService,
     CompanyProvisioningService,
+    ReportsService,
   ],
 })
 export class AccountingModule {}
