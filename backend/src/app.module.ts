@@ -5,6 +5,7 @@ import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { KernelModule } from './kernel/kernel.module';
 import { AccountingModule } from './accounting/accounting.module';
+import { MasterdataModule } from './masterdata/masterdata.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AccountingModule } from './accounting/accounting.module';
     CommonModule,
     AuthModule,
     AccountingModule,
+    MasterdataModule,
     KernelModule,
   ],
 })
