@@ -13,6 +13,7 @@ import { BankingModule } from './banking/banking.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { AssetsModule } from './assets/assets.module';
 import { MisModule } from './mis/mis.module';
+import { ConsolidationModule } from './consolidation/consolidation.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { MisModule } from './mis/mis.module';
     PayrollModule,
     AssetsModule,
     MisModule,
+    ConsolidationModule,
     KernelModule,
   ],
 })
