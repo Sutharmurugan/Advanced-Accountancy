@@ -8,6 +8,7 @@ import { AccountingModule } from './accounting/accounting.module';
 import { MasterdataModule } from './masterdata/masterdata.module';
 import { SalesModule } from './sales/sales.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { PurchasingModule } from './purchasing/purchasing.module';
     AuthModule,
     AccountingModule,
     MasterdataModule,
+    InventoryModule,
     SalesModule,
     PurchasingModule,
     KernelModule,

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccountingModule } from '../accounting/accounting.module';
+import { InventoryModule } from '../inventory/inventory.module';
 import { PurchaseRequestsController, PurchaseRequestsService } from './purchase-requests';
 import { PurchaseOrdersController, PurchaseOrdersService } from './purchase-orders';
 import { GoodsReceiptsController, GoodsReceiptsService } from './goods-receipts';
@@ -8,7 +9,7 @@ import { SupplierPaymentsController, SupplierPaymentsService } from './supplier-
 import { DebitNotesController, DebitNotesService } from './debit-notes';
 
 @Module({
-  imports: [AccountingModule],
+  imports: [AccountingModule, InventoryModule],
   controllers: [
     PurchaseRequestsController,
     PurchaseOrdersController,

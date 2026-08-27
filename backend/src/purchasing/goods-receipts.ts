@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,6 +15,7 @@ import { IsArray, IsDateString, IsNumber, IsOptional, IsString, ValidateNested }
 import { AuditService } from '../common/audit/audit.service';
 import { TenantPrismaService } from '../common/prisma/tenant-prisma.service';
 import { NumberingService } from '../accounting/numbering.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -52,6 +54,7 @@ export class GoodsReceiptsService {
     private readonly tenantPrisma: TenantPrismaService,
     private readonly audit: AuditService,
     private readonly numbering: NumberingService,
+    private readonly inventory: InventoryService,
   ) {}
 
   list(tenantId: string, companyId?: string) {
@@ -112,6 +115,51 @@ export class GoodsReceiptsService {
       return receipt;
     });
   }
+
+  /**
+   * Increases stock quantity/valuation for each line via InventoryService.
+   * Deliberately posts no GL entry — see the module-level comment above:
+   * inventory value is recognized on the GL when the matching Supplier
+   * Invoice posts, not here.
+   */
+  async post(tenantId: string, userId: string, id: string) {
+    return this.tenantPrisma.run(tenantId, async (tx) => {
+      const receipt = await tx.goodsReceipt.findUnique({ where: { id }, include: { lines: true } });
+      if (!receipt) throw new NotFoundException('Goods receipt not found');
+      if (receipt.status !== 'draft') {
+        throw new BadRequestException('Only a draft goods receipt can be posted');
+      }
+
+      for (const line of receipt.lines) {
+        await this.inventory.recordStockIn(
+          tx,
+          {
+            tenantId,
+            companyId: receipt.companyId,
+            warehouseId: receipt.warehouseId,
+            productId: line.productId,
+            sourceModule: 'PURCHASING',
+            sourceDocType: 'goods_receipt',
+            sourceDocId: receipt.id,
+            moveDate: receipt.receiptDate,
+          },
+          Number(line.quantity),
+          Number(line.unitCost),
+        );
+      }
+
+      const posted = await tx.goodsReceipt.update({ where: { id }, data: { status: 'posted' } });
+      await this.audit.record(tx, {
+        tenantId,
+        companyId: receipt.companyId,
+        userId,
+        action: 'post',
+        entityType: 'goods_receipt',
+        entityId: id,
+      });
+      return posted;
+    });
+  }
 }
 
 @Controller('goods-receipts')
@@ -133,5 +181,10 @@ export class GoodsReceiptsController {
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateGoodsReceiptDto) {
     return this.goodsReceipts.create(user.tenantId, user.userId, dto);
+  }
+
+  @Post(':id/post')
+  post(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.goodsReceipts.post(user.tenantId, user.userId, id);
   }
 }

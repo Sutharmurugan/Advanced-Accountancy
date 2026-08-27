@@ -118,4 +118,18 @@ export const STARTER_POSTING_RULES: StarterPostingRule[] = [
       { lineNo: 2, side: 'credit', accountResolver: 'OVERRIDE:accumulatedDepreciationAccount', amountSource: 'amount' },
     ],
   },
+  {
+    // A stock count variance is signed: only one of increaseAmount /
+    // decreaseAmount is ever non-zero for a given adjustment (see
+    // InventoryService.recordAdjustment), so exactly one debit/credit pair
+    // below actually posts — the other two lines are skipped as zero-amount
+    // by the engine, keeping the entry balanced either way.
+    eventType: 'INVENTORY_ADJUSTMENT_POSTED',
+    lines: [
+      { lineNo: 1, side: 'debit', accountResolver: 'CONTROL:INVENTORY', amountSource: 'increaseAmount' },
+      { lineNo: 2, side: 'credit', accountResolver: 'CONTROL:COGS', amountSource: 'increaseAmount' },
+      { lineNo: 3, side: 'debit', accountResolver: 'CONTROL:COGS', amountSource: 'decreaseAmount' },
+      { lineNo: 4, side: 'credit', accountResolver: 'CONTROL:INVENTORY', amountSource: 'decreaseAmount' },
+    ],
+  },
 ];

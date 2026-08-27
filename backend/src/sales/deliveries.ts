@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,6 +15,8 @@ import { IsArray, IsDateString, IsNumber, IsOptional, IsString, ValidateNested }
 import { AuditService } from '../common/audit/audit.service';
 import { TenantPrismaService } from '../common/prisma/tenant-prisma.service';
 import { NumberingService } from '../accounting/numbering.service';
+import { AccountingEngineService } from '../accounting/accounting-engine.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -36,10 +39,12 @@ export class CreateDeliveryDto {
 }
 
 /**
- * Delivery posting (stock-out + COGS via DELIVERY_POSTED) is wired in
- * src/inventory/deliveries-posting.service.ts, added with Phase 6 once
- * weighted-average valuation exists — see that file for why it's a
- * separate piece rather than duplicated here.
+ * Delivery.post() is Phase 6's inventory/COGS wiring: it draws stock out at
+ * the current weighted-average cost (InventoryService), then posts
+ * DELIVERY_POSTED (Debit COGS, Credit Inventory) for that total cost. This
+ * is why Delivery has to stay a draft -> posted document rather than
+ * something created and forgotten — the COGS entry can't exist before the
+ * warehouse actually has a cost to draw from.
  */
 @Injectable()
 export class DeliveriesService {
@@ -47,6 +52,8 @@ export class DeliveriesService {
     private readonly tenantPrisma: TenantPrismaService,
     private readonly audit: AuditService,
     private readonly numbering: NumberingService,
+    private readonly inventory: InventoryService,
+    private readonly engine: AccountingEngineService,
   ) {}
 
   list(tenantId: string, companyId?: string) {
@@ -106,6 +113,65 @@ export class DeliveriesService {
       return delivery;
     });
   }
+
+  async post(tenantId: string, userId: string, id: string) {
+    return this.tenantPrisma.run(tenantId, async (tx) => {
+      const delivery = await tx.delivery.findUnique({ where: { id }, include: { lines: true } });
+      if (!delivery) throw new NotFoundException('Delivery not found');
+      if (delivery.status !== 'draft') {
+        throw new BadRequestException('Only a draft delivery can be posted');
+      }
+
+      let totalCost = 0;
+      for (const line of delivery.lines) {
+        const { totalCost: lineCost } = await this.inventory.recordStockOut(
+          tx,
+          {
+            tenantId,
+            companyId: delivery.companyId,
+            warehouseId: delivery.warehouseId,
+            productId: line.productId,
+            sourceModule: 'SALES',
+            sourceDocType: 'delivery',
+            sourceDocId: delivery.id,
+            moveDate: delivery.deliveryDate,
+          },
+          Number(line.quantity),
+        );
+        totalCost += lineCost;
+      }
+
+      const company = await tx.company.findUniqueOrThrow({ where: { id: delivery.companyId } });
+      const entry = await this.engine.postEvent(tx, {
+        tenantId,
+        companyId: delivery.companyId,
+        eventType: 'DELIVERY_POSTED',
+        entryDate: delivery.deliveryDate,
+        currencyCode: company.baseCurrencyCode,
+        sourceModule: 'SALES',
+        sourceDocType: 'delivery',
+        sourceDocId: delivery.id,
+        description: `Delivery ${delivery.deliveryNumber}`,
+        amounts: { cost: totalCost },
+        createdBy: userId,
+      });
+
+      const posted = await tx.delivery.update({
+        where: { id },
+        data: { status: 'posted', journalEntryId: entry.id },
+      });
+      await this.audit.record(tx, {
+        tenantId,
+        companyId: delivery.companyId,
+        userId,
+        action: 'post',
+        entityType: 'delivery',
+        entityId: id,
+        newValue: { journalEntryId: entry.id, totalCost },
+      });
+      return posted;
+    });
+  }
 }
 
 @Controller('deliveries')
@@ -127,5 +193,10 @@ export class DeliveriesController {
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateDeliveryDto) {
     return this.deliveries.create(user.tenantId, user.userId, dto);
+  }
+
+  @Post(':id/post')
+  post(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.deliveries.post(user.tenantId, user.userId, id);
   }
 }
