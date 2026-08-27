@@ -10,20 +10,26 @@ workflow/approvals and group consolidation — not a standalone bookkeeping app.
 
 ## Status
 
-**Design phase.** No application code has been implemented yet. The full
-system architecture, database design, central accounting engine design,
-security model, MIS/consolidation design and phased roadmap have been produced
-for review and approval before Phase 1 implementation begins.
+**Phase 1 implemented: Multi-Tenant Kernel + Authentication + RBAC.** The
+full architecture was designed and approved first (see below); Phase 1 now
+has a working NestJS + PostgreSQL backend with Row-Level Security tenant
+isolation, JWT + MFA auth, and RBAC — with an automated test suite proving
+the phase's exit criterion (cross-tenant isolation) at the API layer, the
+service layer, and the raw database layer.
 
 Start here:
 
+- [`backend/`](backend/) — the Phase 1 implementation (NestJS + Prisma +
+  PostgreSQL). See [`backend/README.md`](backend/README.md) for setup and
+  how to run the tests.
 - [`docs/architecture/00-OMNIERP-ARCHITECTURE.md`](docs/architecture/00-OMNIERP-ARCHITECTURE.md) —
   the complete architecture document (system design, multi-tenancy, ERD,
   central accounting engine, module map, API design, security/RBAC, MIS,
   consolidation, roadmap, tech stack, risks).
 - [`docs/architecture/schema/kernel-and-accounting.sql`](docs/architecture/schema/kernel-and-accounting.sql) —
   illustrative DDL for the kernel and central accounting engine tables
-  (reference design, not yet applied as a migration).
+  (reference design; the actual applied migrations are in
+  `backend/prisma/migrations/`).
 
 ## Core principle
 
@@ -35,5 +41,5 @@ exactly one place double-entry accounting logic lives.
 
 ## Next step
 
-Awaiting approval on the architecture before Phase 1 (Multi-Tenant Kernel +
-Authentication + RBAC) implementation begins.
+Phase 2: Database + Master Data (Chart of Accounts, tax codes, customers,
+suppliers, employees, products, price lists, projects).

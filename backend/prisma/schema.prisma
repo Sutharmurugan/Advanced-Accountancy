@@ -1,0 +1,274 @@
+// OmniERP — Phase 1 schema: Multi-Tenant Kernel + Auth + RBAC
+//
+// Scope is deliberately limited to what Phase 1 of the roadmap calls for
+// (docs/architecture/00-OMNIERP-ARCHITECTURE.md, section J): tenant/group/
+// company/branch/department/cost-centre/profit-centre/warehouse, users,
+// roles, permissions, access grants, and an append-only audit log. Finance,
+// master data and the accounting engine tables arrive in later phases.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenant hierarchy
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  plan        String   @default("standard")
+  status      String   @default("active") // active | suspended | cancelled
+  storageTier String   @default("pool") @map("storage_tier") // pool | silo
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  businessGroups BusinessGroup[]
+  companies      Company[]
+  users          User[]
+  roles          Role[]
+  auditLogs      AuditLog[]
+
+  @@map("tenants")
+}
+
+model BusinessGroup {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  companies Company[]
+
+  @@map("business_groups")
+}
+
+model Company {
+  id                     String   @id @default(uuid())
+  tenantId               String   @map("tenant_id")
+  businessGroupId        String?  @map("business_group_id")
+  name                   String
+  legalName              String?  @map("legal_name")
+  countryCode            String   @map("country_code")
+  baseCurrencyCode       String   @map("base_currency_code")
+  fiscalYearStartMonth   Int      @default(1) @map("fiscal_year_start_month")
+  taxRegistrationNo      String?  @map("tax_registration_no")
+  status                 String   @default("active") // active | inactive
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  businessGroup      BusinessGroup?      @relation(fields: [businessGroupId], references: [id])
+  branches           Branch[]
+  departments        Department[]
+  costCentres        CostCentre[]
+  profitCentres      ProfitCentre[]
+  warehouses         Warehouse[]
+  userCompanyAccess  UserCompanyAccess[]
+  roles              Role[]
+
+  @@map("companies")
+}
+
+model Branch {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  companyId String   @map("company_id")
+  name      String
+  address   String?
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company     Company      @relation(fields: [companyId], references: [id])
+  departments Department[]
+  warehouses  Warehouse[]
+
+  @@map("branches")
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  companyId String   @map("company_id")
+  branchId  String?  @map("branch_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  branch  Branch? @relation(fields: [branchId], references: [id])
+
+  @@map("departments")
+}
+
+model CostCentre {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  companyId String   @map("company_id")
+  parentId  String?  @map("parent_id")
+  code      String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company      @relation(fields: [companyId], references: [id])
+  parent  CostCentre?  @relation("CostCentreHierarchy", fields: [parentId], references: [id])
+  children CostCentre[] @relation("CostCentreHierarchy")
+
+  @@unique([companyId, code])
+  @@map("cost_centres")
+}
+
+model ProfitCentre {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  companyId String   @map("company_id")
+  code      String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, code])
+  @@map("profit_centres")
+}
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  companyId String   @map("company_id")
+  branchId  String?  @map("branch_id")
+  name      String
+  address   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  branch  Branch? @relation(fields: [branchId], references: [id])
+
+  @@map("warehouses")
+}
+
+// ---------------------------------------------------------------------------
+// Identity, RBAC, access grants
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  email        String
+  passwordHash String    @map("password_hash")
+  status       String    @default("active") // active | disabled
+  mfaEnabled   Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret    String?   @map("mfa_secret")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  companyAccess     UserCompanyAccess[]
+  refreshTokens     RefreshToken[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Role {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  companyId String?  @map("company_id") // null = tenant-level template role
+  name      String
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  company           Company?            @relation(fields: [companyId], references: [id])
+  rolePermissions   RolePermission[]
+  userCompanyAccess UserCompanyAccess[]
+
+  @@unique([tenantId, companyId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  code        String @unique // e.g. 'sales_invoice.approve', 'journal_entry.reverse'
+  module      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserCompanyAccess {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  companyId        String?  @map("company_id") // null = tenant-wide grant (all companies in the tenant)
+  roleId           String   @map("role_id")
+  branchScope      String[] @map("branch_scope") // empty = all branches
+  departmentScope  String[] @map("department_scope")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+  role    Role     @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, companyId, roleId])
+  @@map("user_company_access")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Audit trail — append-only. The application DB role is granted INSERT only
+// (see prisma/sql/002_rls.sql); there is deliberately no update()/delete()
+// path anywhere in application code for this model.
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  companyId   String?  @map("company_id")
+  userId      String?  @map("user_id")
+  action      String   // create | edit | approve | post | cancel | reverse | delete | export | login | permission_change | config_change
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  prevRowHash String?  @map("prev_row_hash")
+  rowHash     String?  @map("row_hash")
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("audit_logs")
+}
