@@ -11,6 +11,7 @@ import { PurchasingModule } from './purchasing/purchasing.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { BankingModule } from './banking/banking.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { AssetsModule } from './assets/assets.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PayrollModule } from './payroll/payroll.module';
     PurchasingModule,
     BankingModule,
     PayrollModule,
+    AssetsModule,
     KernelModule,
   ],
 })
