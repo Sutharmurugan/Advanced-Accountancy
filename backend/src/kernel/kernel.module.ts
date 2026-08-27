@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AccountingModule } from '../accounting/accounting.module';
 import { TenantsController } from './tenants/tenants.controller';
 import { BusinessGroupsController } from './business-groups/business-groups.controller';
 import { BusinessGroupsService } from './business-groups/business-groups.service';
@@ -23,6 +24,7 @@ import { UserCompanyAccessController } from './user-company-access/user-company-
 import { UserCompanyAccessService } from './user-company-access/user-company-access.service';
 
 @Module({
+  imports: [AccountingModule],
   controllers: [
     TenantsController,
     BusinessGroupsController,

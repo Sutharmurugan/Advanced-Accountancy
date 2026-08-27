@@ -741,10 +741,16 @@ model GlAccountBalance {
   companyId          String   @map("company_id")
   accountingPeriodId String   @map("accounting_period_id")
   accountId          String   @map("account_id")
-  branchId           String?  @map("branch_id")
-  departmentId       String?  @map("department_id")
-  costCentreId       String?  @map("cost_centre_id")
-  profitCentreId     String?  @map("profit_centre_id")
+  // Non-null with an empty-string sentinel for "no dimension" — deliberately
+  // not nullable. Postgres unique constraints never treat two NULLs as
+  // duplicates, so upsert-by-this-key would silently insert a new row on
+  // every posting instead of accumulating into one, once any of these are
+  // absent (the common case). Empty string is a real, comparable value, so
+  // ON CONFLICT matches correctly and the running balance stays one row.
+  branchId           String   @default("") @map("branch_id")
+  departmentId       String   @default("") @map("department_id")
+  costCentreId       String   @default("") @map("cost_centre_id")
+  profitCentreId     String   @default("") @map("profit_centre_id")
   debitTotal         Decimal  @default(0) @map("debit_total") @db.Decimal(18, 2)
   creditTotal        Decimal  @default(0) @map("credit_total") @db.Decimal(18, 2)
   updatedAt          DateTime @updatedAt @map("updated_at")

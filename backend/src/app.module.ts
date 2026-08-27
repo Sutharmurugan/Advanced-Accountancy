@@ -4,6 +4,7 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { KernelModule } from './kernel/kernel.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { KernelModule } from './kernel/kernel.module';
     PrismaModule,
     CommonModule,
     AuthModule,
+    AccountingModule,
     KernelModule,
   ],
 })

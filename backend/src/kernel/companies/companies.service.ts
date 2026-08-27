@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService } from '../../common/audit/audit.service';
 import { TenantPrismaService } from '../../common/prisma/tenant-prisma.service';
+import { CompanyProvisioningService } from '../../accounting/company-provisioning.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 
@@ -9,6 +10,7 @@ export class CompaniesService {
   constructor(
     private readonly tenantPrisma: TenantPrismaService,
     private readonly audit: AuditService,
+    private readonly provisioning: CompanyProvisioningService,
   ) {}
 
   list(tenantId: string) {
@@ -30,6 +32,10 @@ export class CompaniesService {
       const company = await tx.company.create({
         data: { tenantId, ...dto },
       });
+      // Provisions a starter Chart of Accounts, default posting rules and
+      // the current fiscal year so the company is immediately postable —
+      // see CompanyProvisioningService for what "starter" means.
+      await this.provisioning.provision(tx, tenantId, company.id, dto.baseCurrencyCode);
       await this.audit.record(tx, {
         tenantId,
         companyId: company.id,
