@@ -26,6 +26,6 @@ import { CreditNotesController, CreditNotesService } from './credit-notes';
     CustomerReceiptsService,
     CreditNotesService,
   ],
-  exports: [DeliveriesService],
+  exports: [DeliveriesService, CustomerReceiptsService],
 })
 export class SalesModule {}

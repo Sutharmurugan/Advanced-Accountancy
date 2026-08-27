@@ -9,6 +9,7 @@ import { MasterdataModule } from './masterdata/masterdata.module';
 import { SalesModule } from './sales/sales.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { BankingModule } from './banking/banking.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { InventoryModule } from './inventory/inventory.module';
     InventoryModule,
     SalesModule,
     PurchasingModule,
+    BankingModule,
     KernelModule,
   ],
 })

@@ -26,6 +26,6 @@ import { DebitNotesController, DebitNotesService } from './debit-notes';
     SupplierPaymentsService,
     DebitNotesService,
   ],
-  exports: [GoodsReceiptsService],
+  exports: [GoodsReceiptsService, SupplierPaymentsService],
 })
 export class PurchasingModule {}
